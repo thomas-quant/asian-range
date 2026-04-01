@@ -4,11 +4,11 @@ from pathlib import Path
 import pandas as pd
 
 
-SESSION_MAP = {
-    "ASIA": "asia_size",
-    "LONDON": "london_size",
-    "NYAM": "nyam_size",
-}
+SESSION_WINDOWS = (
+    ("asia_size", 18 * 60, 22 * 60),
+    ("london_size", 2 * 60, 5 * 60),
+    ("nyam_size", 9 * 60 + 30, 11 * 60),
+)
 DAILY_COLUMNS = ["trading_day", "asia_size", "london_size", "nyam_size"]
 
 
@@ -25,19 +25,29 @@ def assign_trading_day(timestamp: pd.Timestamp) -> pd.Timestamp:
     return timestamp.normalize()
 
 
+def _session_metric_for_minutes(minutes: pd.Series) -> pd.Series:
+    metric = pd.Series(pd.NA, index=minutes.index, dtype="object")
+    for session_name, start_minute, end_minute in SESSION_WINDOWS:
+        in_window = (minutes >= start_minute) & (minutes < end_minute)
+        metric.loc[in_window] = session_name
+    return metric
+
+
 def build_daily_session_sizes(df: pd.DataFrame) -> pd.DataFrame:
     data = df.copy()
     data["DateTime_ET"] = pd.to_datetime(data["DateTime_ET"])
-    data = data[data["session"].isin(SESSION_MAP)].copy()
+    minutes = data["DateTime_ET"].dt.hour * 60 + data["DateTime_ET"].dt.minute
+    data["metric"] = _session_metric_for_minutes(minutes)
+    data = data[data["metric"].notna()].copy()
     data["trading_day"] = data["DateTime_ET"].map(assign_trading_day)
 
     rows = []
-    for (trading_day, session_name), group in data.groupby(["trading_day", "session"], sort=True):
+    for (trading_day, metric), group in data.groupby(["trading_day", "metric"], sort=True):
         first_bar = group.sort_values("DateTime_ET").iloc[0]
         rows.append(
             {
                 "trading_day": trading_day,
-                "metric": SESSION_MAP[session_name],
+                "metric": metric,
                 "session_size": (group["High"].max() - group["Low"].min()) / first_bar["Open"],
             }
         )

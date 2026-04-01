@@ -39,7 +39,13 @@ Use these Eastern Time windows:
 - London: `02:00-05:00 ET`
 - New York morning: `09:30-11:00 ET`
 
-The dataset already includes a `session` column with values including `ASIA`, `LONDON`, and `NYAM`. Reuse those labels where they match the stated windows instead of reconstructing sessions from scratch unless verification shows a mismatch.
+These windows should be interpreted as start-inclusive and end-exclusive when working with 1-minute bars:
+
+- Asia: `18:00 <= t < 22:00`
+- London: `02:00 <= t < 05:00`
+- New York morning: `09:30 <= t < 11:00`
+
+Verification against the parquet dataset showed that the vendor `session` labels do not match these windows, so implementation must derive sessions directly from `DateTime_ET` rather than reusing the dataset `session` column for aggregation.
 
 ## Session Size Metric
 

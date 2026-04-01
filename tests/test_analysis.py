@@ -95,3 +95,29 @@ def test_build_daily_session_sizes_ignores_non_target_sessions_and_keeps_schema(
     assert result.iloc[0]["asia_size"] == pytest.approx(0.02)
     assert pd.isna(result.iloc[0]["london_size"])
     assert pd.isna(result.iloc[0]["nyam_size"])
+
+
+def test_build_daily_session_sizes_uses_explicit_time_windows_not_vendor_labels():
+    from asia_range.analysis import build_daily_session_sizes
+
+    df = pd.DataFrame(
+        [
+            {"DateTime_ET": "2020-09-01 18:00:00", "session": "OTHER", "Open": 100.0, "High": 102.0, "Low": 99.0},
+            {"DateTime_ET": "2020-09-01 21:59:00", "session": "PM", "Open": 101.0, "High": 104.0, "Low": 98.0},
+            {"DateTime_ET": "2020-09-01 22:30:00", "session": "ASIA", "Open": 102.0, "High": 150.0, "Low": 50.0},
+            {"DateTime_ET": "2020-09-02 02:00:00", "session": "OTHER", "Open": 110.0, "High": 112.0, "Low": 109.0},
+            {"DateTime_ET": "2020-09-02 04:59:00", "session": "OTHER", "Open": 111.0, "High": 113.0, "Low": 108.0},
+            {"DateTime_ET": "2020-09-02 05:00:00", "session": "LONDON", "Open": 112.0, "High": 200.0, "Low": 10.0},
+            {"DateTime_ET": "2020-09-02 09:30:00", "session": "OTHER", "Open": 120.0, "High": 121.0, "Low": 118.0},
+            {"DateTime_ET": "2020-09-02 10:59:00", "session": "OTHER", "Open": 121.0, "High": 122.0, "Low": 117.0},
+            {"DateTime_ET": "2020-09-02 11:00:00", "session": "NYAM", "Open": 122.0, "High": 300.0, "Low": 1.0},
+        ]
+    )
+    df["DateTime_ET"] = pd.to_datetime(df["DateTime_ET"])
+
+    result = build_daily_session_sizes(df)
+
+    row = result.loc[result["trading_day"] == pd.Timestamp("2020-09-02")].iloc[0]
+    assert row["asia_size"] == pytest.approx((104.0 - 98.0) / 100.0)
+    assert row["london_size"] == pytest.approx((113.0 - 108.0) / 110.0)
+    assert row["nyam_size"] == pytest.approx((122.0 - 117.0) / 120.0)
