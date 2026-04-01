@@ -1,0 +1,5 @@
+from asia_range.analysis import main
+
+
+if __name__ == "__main__":
+    main()
